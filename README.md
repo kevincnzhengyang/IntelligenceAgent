@@ -1,0 +1,2 @@
+# IntelligenceAgent
+Get trading information
