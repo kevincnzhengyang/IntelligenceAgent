@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "intelligenceagent"
+version = "0.1.0"
+description = "Get trading information"
+authors = ["kevin.z.y <kevin.cn.zhengyang@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+futu-api = "^9.1.5108"
+akshare = "^1.16.32"
+tushare = "^1.4.19"
+fastapi = "^0.115.11"
+python-telegram-bot = "^21.11.1"
+requests = "^2.32.3"
+pandas = "^2.2.3"
+celery = {extras = ["redis"], version = "^5.4.0"}
+redis = {extras = ["hiredis"], version = "^5.2.1"}
+dotenv = "^0.9.9"
+apscheduler = "^3.11.0"
+databases = "^0.9.0"
+yfinance = "^0.2.62"
+orjson = "^3.10.18"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
