@@ -2,7 +2,7 @@
 Author: kevin.z.y kevin.cn.zhengyang@gmail.com
 Date: 2025-06-11 18:55:21
 LastEditors: kevin.z.y kevin.cn.zhengyang@gmail.com
-LastEditTime: 2025-06-11 21:27:09
+LastEditTime: 2025-06-11 22:07:31
 FilePath: /IntelligenceAgent/app/datashare/hist_yfinance.py
 Description: 
 Copyright (c) 2025 by ${git_name_email}, All Rights Reserved.
@@ -11,8 +11,9 @@ Copyright (c) 2025 by ${git_name_email}, All Rights Reserved.
 
 from fastapi import APIRouter, Depends, HTTPException
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, time
 
+import calendar as cd
 import asyncio as ac
 import orjson as oj
 import yfinance as yf
@@ -24,8 +25,26 @@ from ..models import Securities
 
 router = APIRouter()
 
+def format_code(symbol: str) -> str:
+    seg = symbol.split('.')
+    if len(seg) != 2:
+        # US market
+        return symbol.upper()
+    
+    code = seg[0]
+    mkt = seg[-1].upper()
+    if mkt in ['SS', 'SZ']:
+        code = code.rjust(6, '0')
+    elif mkt == 'HK':
+        code = code.rjust(4, '0')
+    else:
+        raise ValueError(f"unknow symble {symbol}")
+    return f"{code}.{mkt}"
+
 @router.post("/securities/add/{code}", tags=["historical data yfinance"])
 async def create_item(code: str, db: Session = Depends(get_db)):
+    code = format_code(code)
+    
     # create if it not exists
     item = db.query(Securities).filter(Securities.code == code).first()
     if not item:
@@ -35,6 +54,23 @@ async def create_item(code: str, db: Session = Depends(get_db)):
         name = sec.info.get('longName')
         if not name:
             raise ValueError(f"No data found for {code}")
+        
+        # check if trading stop or not
+        now = datetime.now().time()
+        # for SS, SZ and HK
+        if code.split('.')[-1] in ['SS', 'SZ', 'HK']:
+            stop_time = time(16, 0, 0)
+        else:
+            stop_time = time(5, 0, 0)
+        is_stopped = now > stop_time
+        
+        # end of week
+        today = datetime.today()
+        is_weekend = today.weekday() >= 5
+        
+        # end of month
+        last_day = cd.monthrange(today.year, today.month)[1]
+        is_month_end = (today.day == last_day)
         
         # get historical data by yfinance
         for interv, label in [('1d', 'daily'), ('1wk', 'weekly'), ('1mo', 'monthly')]:
@@ -58,6 +94,8 @@ async def create_item(code: str, db: Session = Depends(get_db)):
 
 @router.post("/securities/del/{code}", tags=["historical data yfinance"])
 def read_item(code: str, db: Session = Depends(get_db)):
+    code = format_code(code)
+    
     item = db.query(Securities).filter(Securities.code == code).first()
     if item:
         db.delete(item)  # 删除对象
@@ -71,6 +109,8 @@ def read_items(db: Session = Depends(get_db)):
 
 @router.get("/securities/{code}", tags=["historical data yfinance"])
 def read_item(code: str, db: Session = Depends(get_db)):
+    code = format_code(code)
+    
     item = db.query(Securities).filter(Securities.code == code).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -78,6 +118,8 @@ def read_item(code: str, db: Session = Depends(get_db)):
 
 @router.get("/securities/holders/{code}", tags=["financial data yfinance"])
 async def get_holders(code: str, db: Session = Depends(get_db)):
+    code = format_code(code)
+    
     item = db.query(Securities).filter(Securities.code == code).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -114,6 +156,8 @@ async def get_holders(code: str, db: Session = Depends(get_db)):
 
 @router.get("/securities/finance/{code}", tags=["financial data yfinance"])
 async def get_finance(code: str, db: Session = Depends(get_db)):
+    code = format_code(code)
+    
     item = db.query(Securities).filter(Securities.code == code).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
